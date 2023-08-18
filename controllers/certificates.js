@@ -22,12 +22,7 @@ module.exports.createCertificate = async (req, res, next) => {
 }
 
 module.exports.showCertificate = async (req, res,) => {
-    const certificate = await Certificate.findById(req.params.id).populate({
-        path: 'reviews',
-        populate: {
-            path: 'author'
-        }
-    }).populate('author');
+    const certificate = await Certificate.findById(req.params.id)
     if (!certificate) {
         req.flash('error', 'Cannot find that certificate!');
         return res.redirect('/certificates');
