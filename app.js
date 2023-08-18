@@ -14,30 +14,21 @@ const methodOverride = require('method-override');
 const passport = require('passport');
 const LocalStrategy = require('passport-local');
 const User = require('./models/user');
-const Profile = require('./models/profile');
-const Doctor = require('./models/doctor');
-const Certificate = require('./models/certificate');
-const {isLoggedIn}=require('./middleware');
-
+const Student= require('./smodels/student');
 
 const userRoutes = require('./routes/users');
-const certificateRoutes = require('./routes/certificates');
+const centreRoutes = require('./routes/centres');
+const reviewRoutes = require('./routes/reviews');
 
-
-// const dbUrl = 'mongodb+srv://arahuln27:arahuln27@cluster0.9bajefq.mongodb.net/?retryWrites=true&w=majority'
+const dbUrl = process.env.MONGODB_URI
 // process.env.DB_URL
-mongoose.connect('mongodb+srv://arahuln27:arahuln27@cluster0.brblyjw.mongodb.net/?retryWrites=true&w=majority'
-, {
-  useNewUrlParser: true,
-  useCreateIndex: true,
-  useUnifiedTopology: true,
-  useFindAndModify: false
-});
 
-const db = mongoose.connection;
-db.on("error", console.error.bind(console, "connection error:"));
-db.once("open", () => {
-  console.log("Database connected");
+// 'mongodb://127.0.0.1:27017/STUDENTS'
+mongoose.connect(dbUrl)
+.then(()=>{console.log("Mongoose Connection open!!!")})
+.catch(err=>{
+    console.log('Oh No!! mongoose connection error!!');
+    console.log(err)
 });
 
 const app = express();
@@ -82,208 +73,61 @@ app.use((req, res, next) => {
 
 
 app.use('/', userRoutes);
-app.use('/certificates', certificateRoutes)
+app.use('/centres', centreRoutes)
+app.use('/centres/:id/reviews', reviewRoutes)
 
 
-
-
-
-
-
-
-
-
-app.get('/healthtopics/diarrhea', async(req, res) => {
-
-   res.render('healthtopics/diarrhea')
-});
-app.get('/healthtopics/fever', async(req, res) => {
-
-  res.render('healthtopics/fever')
-});
-app.get('/healthtopics/allergies', async(req, res) => {
-
-  res.render('healthtopics/allergies')
-});
-
-app.get('/donation',isLoggedIn, async(req, res) => {
-  try {
-    const userId = req.user._id;
-    const profiles = await Profile.find({ userId: userId }).exec();
-    res.render('donation', { profiles: profiles, user: req.user });
-  } catch (err) {
-    console.log(err);
-    res.status(500).send('An error occurred');
-  }
-  // res.render('healthtopics/emergencies')
+app.get('/', (req, res) => {
+    res.render('home')
 });
 
 
 
+const centres=['IITISM','IITD','IITB','IITBHU']
 
-app.get('/',isLoggedIn, async(req, res) => {
-    try {
-        const userId = req.user._id;
-        const profiles = await Profile.find({ userId: userId }).exec();
-        res.render('home', { profiles: profiles, user: req.user });
-      } catch (err) {
-        console.log(err);
-        res.status(500).send('An error occurred');
-      }
-    // res.render('home')
-});
-
-//'mongodb://127.0.0.1:27017/web'
-
-//profile start
-
-app.get('/profiles',isLoggedIn, async (req, res) => {
-
-    try {
-      const userId = req.user._id;
-      const profiles = await Profile.find({ userId: userId }).exec();
-      res.render('profiles/index', { profiles: profiles, user: req.user });
-    } catch (err) {
-      console.log(err);
-      res.status(500).send('An error occurred');
+app.get('/students', async(req, res) => {
+    const {centre} = req.query;
+    if(centre){
+      const students = await Student.find({centre})
+      res.render('students/index',{students,centre})
+    }else{
+        const students = await Student.find({})
+        res.render('students/index',{students,centre:'All'})
     }
-  })
-  
-  
-  app.get('/profiles/new',isLoggedIn, (req, res) => {
-    const userId = req.user._id;
-      res.render('profiles/new', { user: req.user })
-  })
-  
-  app.post('/profiles',isLoggedIn, async (req, res) => {
-      const newProfile = new Profile(req.body);
-      await newProfile.save();
-      res.redirect(`/profiles/${newProfile._id}`)
-  })
-  
-  app.get('/profiles/:id',isLoggedIn, async (req, res) => {
-      const { id } = req.params;
-      const profile = await Profile.findById(id)
-      res.render('profiles/show', { profile })
-  })
-
-  app.get('/profiles/:id/edit',isLoggedIn, async (req, res) => {
-    const { id } = req.params;
-    const profile = await Profile.findById(id);
-    res.render('profiles/edit', { profile });
 });
 
-app.put('/profiles/:id',isLoggedIn, async (req, res) => {
-    const { id } = req.params;
-    const profile = await Profile.findByIdAndUpdate(id, req.body, { runValidators: true, new: true });
-    res.redirect(`/profiles/${profile._id}`);
-});
+app.get('/students/new',(req,res)=>{
+    res.render('students/new',{centres})
+})   
 
-app.delete('/profiles/:id',isLoggedIn, async (req, res) => {
-    const { id } = req.params;
-    await Profile.findByIdAndDelete(id);
-    res.redirect('/profiles');
-});
-
-//profile end
-
-
-
-
-
-//doctors start
-
-const categories =['myself', 'others'];
-const genders =['male', 'female','other'];
-
-
-
-app.get('/doctors/doct',isLoggedIn, async (req, res) => {
-  const userId = req.user._id;
-      
-      const profiles = await Profile.find({ userId: userId }).exec();
-  const doctors = await Doctor.find();
-  res.render('doctors/doct', { doctors: doctors,profiles:profiles})
+app.post('/students',async (req,res)=>{
+    const newStudent = new Student(req.body)
+    await newStudent.save();
+    res.redirect(`/students/${newStudent._id}`)
 })
 
+app.get('/students/:id', async (req, res) => {
+    const {id} = req.params;
+    const student = await Student.findById(id);
+    res.render('students/show',{student})})
 
-app.get('/doctors',isLoggedIn, async (req, res) => {
+app.get('/students/:id/edit',async(req,res)=>{
+    const {id} = req.params;
+    const student = await Student.findById(id);
+    res.render('students/edit',{student, centres})
+})  
 
-    try {
-      const userId = req.user._id;
-      const doctors = await Doctor.find({ userId: userId }).exec();
-      const profiles = await Profile.find({ userId: userId }).exec();
-      res.render('doctors/index', { doctors: doctors,profiles:profiles, user: req.user });
-    } catch (err) {
-      console.log(err);
-      res.status(500).send('An error occurred');
-    }
-  })
-  
-  app.get('/doctors/new',isLoggedIn, async(req, res) => {
-    const userId = req.user._id;
-    const profiles = await Profile.find({ userId: userId }).exec();
-      res.render('doctors/new', { user: req.user,profiles:profiles,categories ,genders})
-  })
-  
-  app.post('/doctors',isLoggedIn, async (req, res) => {
-      const newDoctor = new Doctor(req.body);
-      await newDoctor.save();
-      res.redirect(`/doctors/${newDoctor._id}`)
-  })
-  
-  app.get('/doctors/:id',isLoggedIn, async (req, res) => {
-      const { id } = req.params;
-      const doctor = await Doctor.findById(id)
-      res.render('doctors/show', { doctor })
-  })
-
-  app.get('/doctors/:id/edit',isLoggedIn, async (req, res) => {
-    const { id } = req.params;
-    const doctor = await Doctor.findById(id);
-    res.render('doctors/edit', { doctor });
-});
-
-app.put('/doctors/:id',isLoggedIn, async (req, res) => {
-    const { id } = req.params;
-    const doctor = await Doctor.findByIdAndUpdate(id, req.body, { runValidators: true, new: true });
-    res.redirect(`/doctors/${doctor._id}`);
-});
-
-app.delete('/doctors/:id',isLoggedIn, async (req, res) => {
-    const { id } = req.params;
-    await Doctor.findByIdAndDelete(id);
-    res.redirect('/doctors');
-});
-
-
-//doctors end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+app.put('/students/:id',async(req,res)=>{
+    const {id} = req.params;
+    const student = await Student.findByIdAndUpdate(id, req.body, {runValidators:true , new:true});
+    res.redirect(`/students/${student._id}`);
+})
+ 
+app.delete('/students/:id',async(req,res)=>{
+    const {id} = req.params;
+    const deleteStudent = await Student.findByIdAndDelete(id);
+    res.redirect('/students');
+})
 
 
 
